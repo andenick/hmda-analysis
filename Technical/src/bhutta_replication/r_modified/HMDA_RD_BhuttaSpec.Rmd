@@ -1,0 +1,273 @@
+---
+title: "HMDA RD Analysis - Bhutta (2011) Specification"
+author: "Bhutta Replication Project"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Bhutta (2011) Replication - Modified Specification
+
+This script implements the Bhutta (2011) specification for CRA analysis.
+
+**KEY DIFFERENCES FROM ORIGINAL R CODE:**
+1. NO central_city_flag filter (Bhutta does NOT restrict to central city)
+2. Uses total housing units >= 100 (not owner-occupied)
+3. Includes group quarters filter (< 30%)
+
+## 1. Setup
+
+```{r packages, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(fixest)
+library(modelsummary)
+```
+
+```{r filepaths}
+# Define paths - adjust as needed
+base_path <- file.path(Sys.getenv("DATA_ROOT", "data"), "Inputs/Old/CRA_code/_files2/")
+output_path <- file.path(Sys.getenv("OUTPUT_ROOT", "outputs"), "bhutta_replication/output/")
+
+# Create output directory if it doesn't exist
+dir.create(output_path, recursive = TRUE, showWarnings = FALSE)
+```
+
+## 2. Data Loading
+
+This assumes you have the combined_data5 file from the original processing pipeline.
+If not, you'll need to run the data preparation steps first.
+
+```{r load_data, eval=FALSE}
+# Load the pre-central-city-filter data (step 15)
+# This is the data BEFORE the central city filter is applied
+combined_data5 <- read.csv(paste0(base_path, "1990to2006/out/combined_lar_step15.csv"))
+```
+
+## 3. Apply Bhutta Specification Filters
+
+**CRITICAL: This is where we differ from the original R code**
+
+```{r bhutta_filters, eval=FALSE}
+# ============================================================
+# BHUTTA SPECIFICATION - KEY DIFFERENCES
+# ============================================================
+
+# STEP 1: DO NOT filter to central city
+# ORIGINAL CODE (line 657): combined_data6 <- combined_data5 %>% filter(central_city_flag == 1)
+# BHUTTA SPEC: Skip this filter entirely
+combined_data_bhutta <- combined_data5
+
+# STEP 2: Geographic exclusions (same as original)
+combined_data_bhutta <- combined_data_bhutta %>%
+    mutate(state_code = state_code.x) %>%
+    mutate(county_code = county_code.x) %>%
+    filter(state_code != 2) %>% # Exclude Alaska
+    filter(state_code != 15) # Exclude Hawaii
+
+# STEP 3: Housing unit filter - USE TOTAL, NOT OWNER-OCCUPIED
+# ORIGINAL CODE: filter(ownOcc_housingUnits >= 100)
+# BHUTTA SPEC: filter(totalHousingUnits >= 100)
+combined_data_bhutta <- combined_data_bhutta %>%
+    filter(totalHousingUnits >= 100)
+
+# STEP 4: Group quarters filter (Bhutta uses < 30%)
+# This may not be in your data - skip if not available
+# combined_data_bhutta <- combined_data_bhutta %>%
+#   filter(group_quarters_pct < 0.30)
+
+# Clean up columns
+combined_data_bhutta <- combined_data_bhutta %>%
+    select(
+        -msamd.x,
+        -state_code.x, -state_code.y,
+        -county_code.x, -county_code.y
+    )
+
+cat("Bhutta specification sample size:", nrow(combined_data_bhutta), "\n")
+```
+
+## 4. Create Analysis Variables
+
+```{r analysis_vars, eval=FALSE}
+# Calculate housing age proportions
+combined_data_bhutta$totalHousingUnits <- rowSums(combined_data_bhutta[, c(
+    "housingUnits_19891990", "housingUnits_19851988",
+    "housingUnits_19801984", "housingUnits_19701979",
+    "housingUnits_19601969", "housingUnits_19501959",
+    "housingUnits_19401949", "housingUnits_pre1939"
+)], na.rm = TRUE)
+
+combined_data_bhutta$prop_pre1940 <- combined_data_bhutta$housingUnits_pre1939 / combined_data_bhutta$totalHousingUnits
+
+combined_data_bhutta$housingUnits_1940_1969 <- combined_data_bhutta$housingUnits_19601969 +
+    combined_data_bhutta$housingUnits_19501959 +
+    combined_data_bhutta$housingUnits_19401949
+
+combined_data_bhutta$prop_1940_1969 <- combined_data_bhutta$housingUnits_1940_1969 / combined_data_bhutta$totalHousingUnits
+
+# Log transformations
+combined_data_bhutta$ln_totalHousingUnits <- log(combined_data_bhutta$totalHousingUnits)
+combined_data_bhutta$ln_ownOcc_housingUnits <- log(pmax(combined_data_bhutta$ownOcc_housingUnits, 1))
+combined_data_bhutta$ln_ownOcc_housingUnits_medianValue <- log(pmax(combined_data_bhutta$ownOcc_housingUnits_medianValue, 1))
+
+# Create treatment indicator
+combined_data_bhutta$tract_income_low <- ifelse(combined_data_bhutta$decennial_msa_median_family_income_percentage < 0.80, 1, 0)
+
+# Create GSE goal indicator (TM <= 0.90)
+combined_data_bhutta$d_mfi_percentage_ninety <- ifelse(combined_data_bhutta$decennial_msa_median_family_income_percentage <= 0.90, 1, 0)
+
+# Grouping variable
+combined_data_bhutta <- combined_data_bhutta %>%
+    mutate(group_variable = case_when(
+        decennial_msa_median_family_income_percentage >= 0.50 & decennial_msa_median_family_income_percentage < 0.75 ~ "g5075",
+        decennial_msa_median_family_income_percentage >= 0.75 & decennial_msa_median_family_income_percentage < 0.85 ~ "g7585",
+        decennial_msa_median_family_income_percentage > 0.85 & decennial_msa_median_family_income_percentage <= 1.10 ~ "g85110",
+        TRUE ~ NA_character_
+    ))
+```
+
+## 5. Define Control Variables
+
+```{r controls, eval=FALSE}
+# Control columns for narrow bandwidth (h=0.05)
+control_columns <- c(
+    "minority_percentage",
+    "ln_ownOcc_housingUnits", # Bhutta uses log owner-occupied
+    "ln_ownOcc_housingUnits_medianValue",
+    "poverty_level_percentage",
+    "prop_pre1940",
+    "prop_1940_1969"
+)
+
+# Control columns for wide bandwidth (h=0.30) - includes GSE indicator
+control_columns30 <- c(
+    "minority_percentage",
+    "ln_ownOcc_housingUnits",
+    "ln_ownOcc_housingUnits_medianValue",
+    "poverty_level_percentage",
+    "prop_pre1940",
+    "prop_1940_1969",
+    "d_mfi_percentage_ninety"
+)
+```
+
+## 6. RD Regression Function
+
+```{r regression_function, eval=FALSE}
+run_regression <- function(data, outcome_var, h, control_function) {
+    # Select the appropriate control columns based on bandwidth
+    if (h == 0.30) {
+        control_vars <- control_columns30
+    } else {
+        control_vars <- control_columns
+    }
+
+    # Create the formula based on the control function
+    if (control_function == "linear") {
+        formula <- as.formula(paste0(
+            outcome_var, " ~ tract_income_low + decennial_msa_median_family_income_percentage + ",
+            paste(control_vars, collapse = " + "), " | metropolitan_area_code"
+        ))
+    } else if (control_function == "cubic") {
+        formula <- as.formula(paste0(
+            outcome_var, " ~ tract_income_low + poly(decennial_msa_median_family_income_percentage, 3) + ",
+            paste(control_vars, collapse = " + "), " | metropolitan_area_code"
+        ))
+    } else {
+        stop("Invalid control function specified.")
+    }
+
+    # Filter data based on bandwidth (h)
+    data_filtered <- data %>%
+        filter(abs(decennial_msa_median_family_income_percentage - 0.80) <= h)
+
+    # Run the regression using fixest package for clustered standard errors
+    model <- feols(formula, data = data_filtered, cluster = ~metropolitan_area_code)
+
+    return(model)
+}
+```
+
+## 7. Run Regressions
+
+```{r run_regressions, eval=FALSE}
+# Run regressions for ALL MSAs (Bhutta specification)
+cat("\n===== BHUTTA SPECIFICATION RESULTS =====\n")
+cat("(NO central city filter, total HU >= 100)\n\n")
+
+model_all_bhutta <- run_regression(combined_data_bhutta, "ln_number_of_loans", h = 0.05, "linear")
+model_large_linear_bhutta <- run_regression(combined_data_bhutta_large, "ln_number_of_loans", h = 0.05, "linear")
+model_large_cubic_bhutta <- run_regression(combined_data_bhutta_large, "ln_number_of_loans", h = 0.30, "cubic")
+
+# Output results
+modelsummary(
+    list(
+        "All MSAs" = model_all_bhutta,
+        "Large MSAs (Linear)" = model_large_linear_bhutta,
+        "Large MSAs (Cubic)" = model_large_cubic_bhutta
+    ),
+    output = paste0(output_path, "bhutta_spec_regression_results.xlsx"),
+    title = "Bhutta (2011) Specification - RD Results",
+    stars = TRUE,
+    gof_omit = "DF|Deviance|Log.Lik.|AIC|BIC"
+)
+```
+
+## 8. Sample Size Comparison
+
+```{r sample_comparison, eval=FALSE}
+# Compare sample sizes between original and Bhutta specification
+cat("\n===== SAMPLE SIZE COMPARISON =====\n\n")
+
+# Original specification (with central city filter)
+original_sample <- combined_data5 %>%
+    filter(central_city_flag == 1) %>%
+    filter(state_code.x != 2 & state_code.x != 15) %>%
+    filter(ownOcc_housingUnits >= 100)
+
+# Bhutta specification (without central city filter)
+bhutta_sample <- combined_data5 %>%
+    filter(state_code.x != 2 & state_code.x != 15) %>%
+    filter(totalHousingUnits >= 100)
+
+cat("Original specification (central city only):", nrow(original_sample), "\n")
+cat("Bhutta specification (all MSA tracts):     ", nrow(bhutta_sample), "\n")
+cat("Difference:                                ", nrow(bhutta_sample) - nrow(original_sample), "\n")
+cat(
+    "Percent removed by central city filter:    ",
+    round((nrow(bhutta_sample) - nrow(original_sample)) / nrow(bhutta_sample) * 100, 1), "%\n"
+)
+
+# Narrow bandwidth comparison
+original_narrow <- original_sample %>%
+    filter(abs(decennial_msa_median_family_income_percentage - 0.80) <= 0.05)
+bhutta_narrow <- bhutta_sample %>%
+    filter(abs(decennial_msa_median_family_income_percentage - 0.80) <= 0.05)
+
+cat("\nNarrow bandwidth (h=0.05):\n")
+cat("Original:     ", nrow(original_narrow), "\n")
+cat("Bhutta spec:  ", nrow(bhutta_narrow), "\n")
+```
+
+## 9. Expected Results
+
+Based on our Python analysis:
+
+| Specification | β Coefficient | SE | Sign |
+|--------------|---------------|-----|------|
+| Original R (central city) | -0.088 | (0.086) | ❌ Wrong |
+| Bhutta spec (all MSA) | +0.007 to +0.08 | (~0.03) | ✅ Correct |
+| Bhutta (2011) paper | +0.0764*** | (0.0274) | ✅ Target |
+
+The key insight is that removing the central city filter should:
+1. **Reverse the sign** from negative to positive
+2. **Reduce standard errors** (larger sample)
+3. **Increase statistical significance**
+
+---
+
+*This script implements the Bhutta (2011) specification without modifying the original R code.*
+*See SPECIFICATION_COMPARISON_REPORT.md for full analysis.*

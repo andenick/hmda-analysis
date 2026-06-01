@@ -1,0 +1,15 @@
+# HMDA Dashboard - Streamlit Cloud Requirements
+# Simplified dependencies for easy deployment on Streamlit Cloud
+
+# Core Framework
+streamlit>=1.28.0
+
+# Data Processing
+pandas>=2.1.0
+numpy>=1.24.0
+
+# Visualizations
+plotly>=5.17.0
+
+# Utilities
+pathlib>=1.0.1

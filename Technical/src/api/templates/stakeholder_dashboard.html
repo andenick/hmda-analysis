@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Explore home mortgage lending data in your community. Understand lending patterns, identify disparities, and access fair housing resources.">
+    <title>HMDA Community Explorer - Home Mortgage Data for Your Neighborhood</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+
+    <!-- Plotly.js -->
+    <script src="https://cdn.plotly.com/plotly-2.26.0.min.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #1f4788;
+            --secondary-color: #4a90e2;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --light-bg: #f8f9fa;
+            --dark-text: #212529;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--dark-text);
+            line-height: 1.6;
+        }
+
+        /* Accessibility improvements */
+        a:focus,
+        button:focus,
+        select:focus,
+        input:focus {
+            outline: 3px solid var(--secondary-color);
+            outline-offset: 2px;
+        }
+
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            background: var(--primary-color);
+            color: white;
+            padding: 8px;
+            text-decoration: none;
+            z-index: 100;
+        }
+
+        .skip-link:focus {
+            top: 0;
+        }
+
+        /* Header */
+        .main-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+
+        .main-header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .main-header p {
+            font-size: 1.2rem;
+            opacity: 0.95;
+        }
+
+        /* Cards */
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            height: 100%;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin: 0.5rem 0;
+        }
+
+        .stat-label {
+            font-size: 1rem;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-icon {
+            font-size: 3rem;
+            color: var(--secondary-color);
+            opacity: 0.3;
+            position: absolute;
+            right: 1rem;
+            top: 1rem;
+        }
+
+        /* Section headers */
+        .section-header {
+            margin: 3rem 0 1.5rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 3px solid var(--primary-color);
+        }
+
+        .section-header h2 {
+            color: var(--primary-color);
+            font-weight: 700;
+            font-size: 2rem;
+        }
+
+        .section-header p {
+            color: #6c757d;
+            margin-top: 0.5rem;
+        }
+
+        /* Explanation boxes */
+        .explainer-box {
+            background: #e3f2fd;
+            border-left: 4px solid var(--secondary-color);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 8px;
+        }
+
+        .explainer-box h3 {
+            color: var(--primary-color);
+            font-size: 1.3rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .explainer-box ul {
+            margin-bottom: 0;
+        }
+
+        /* Chart containers */
+        .chart-container {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin: 1.5rem 0;
+        }
+
+        .chart-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+
+        /* Buttons */
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            border-radius: 8px;
+        }
+
+        .btn-primary:hover {
+            background-color: #163464;
+            border-color: #163464;
+        }
+
+        .btn-outline-primary {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            border-radius: 8px;
+        }
+
+        .btn-outline-primary:hover {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        /* Download section */
+        .download-section {
+            background: var(--light-bg);
+            padding: 2rem;
+            border-radius: 12px;
+            margin: 2rem 0;
+        }
+
+        /* Footer */
+        .main-footer {
+            background: var(--dark-text);
+            color: white;
+            padding: 3rem 0 1rem 0;
+            margin-top: 4rem;
+        }
+
+        .main-footer a {
+            color: var(--secondary-color);
+            text-decoration: none;
+        }
+
+        .main-footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Loading spinner */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .loading-overlay.hidden {
+            display: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .main-header h1 {
+                font-size: 1.8rem;
+            }
+
+            .stat-number {
+                font-size: 2rem;
+            }
+
+            .section-header h2 {
+                font-size: 1.5rem;
+            }
+        }
+
+        /* High contrast mode support */
+        @media (prefers-contrast: high) {
+            .stat-card {
+                border: 2px solid var(--primary-color);
+            }
+
+            .explainer-box {
+                border: 2px solid var(--secondary-color);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Skip to main content link for accessibility -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <!-- Loading overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status" style="width: 4rem; height: 4rem;">
+                <span class="visually-hidden">Loading data...</span>
+            </div>
+            <p class="mt-3 fs-5">Loading mortgage data...</p>
+        </div>
+    </div>
+
+    <!-- Main Header -->
+    <header class="main-header" role="banner">
+        <div class="container">
+            <h1>HMDA Community Explorer</h1>
+            <p>Discover home mortgage lending patterns in your community</p>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main id="main-content" class="container" role="main">
+
+        <!-- What is HMDA? -->
+        <section aria-labelledby="what-is-hmda">
+            <div class="explainer-box">
+                <h3 id="what-is-hmda"><i class="bi bi-info-circle"></i> What is HMDA Data?</h3>
+                <p><strong>The Home Mortgage Disclosure Act (HMDA)</strong> requires banks and lenders to report
+                    information about mortgage applications and loans. This helps communities:</p>
+                <ul>
+                    <li><strong>Understand lending patterns</strong> - See where loans are being made and who is getting
+                        them</li>
+                    <li><strong>Identify discrimination</strong> - Spot unfair lending practices based on race,
+                        ethnicity, or geography</li>
+                    <li><strong>Hold lenders accountable</strong> - Know which institutions are serving your community
+                        well</li>
+                    <li><strong>Advocate for change</strong> - Use data to support fair housing initiatives</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Key Statistics -->
+        <section aria-labelledby="key-stats">
+            <div class="section-header">
+                <h2 id="key-stats">National Overview</h2>
+                <p>Key statistics from the most recent mortgage lending data</p>
+            </div>
+
+            <div class="row g-4" id="statsContainer">
+                <div class="col-md-3">
+                    <div class="stat-card position-relative">
+                        <i class="bi bi-currency-dollar stat-icon" aria-hidden="true"></i>
+                        <div class="stat-label">Total Loan Volume</div>
+                        <div class="stat-number" id="stat-loan-volume">Loading...</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card position-relative">
+                        <i class="bi bi-file-earmark-text stat-icon" aria-hidden="true"></i>
+                        <div class="stat-label">Applications</div>
+                        <div class="stat-number" id="stat-applications">Loading...</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card position-relative">
+                        <i class="bi bi-geo-alt stat-icon" aria-hidden="true"></i>
+                        <div class="stat-label">Counties</div>
+                        <div class="stat-number" id="stat-counties">Loading...</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card position-relative">
+                        <i class="bi bi-building stat-icon" aria-hidden="true"></i>
+                        <div class="stat-label">Lenders</div>
+                        <div class="stat-number" id="stat-lenders">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Find Your Community -->
+        <section aria-labelledby="find-community">
+            <div class="section-header">
+                <h2 id="find-community">Find Your Community</h2>
+                <p>Explore lending patterns by state and county</p>
+            </div>
+
+            <div class="chart-container">
+                <div id="stateMapChart" aria-label="Interactive map showing lending volume by state"></div>
+            </div>
+
+            <div class="explainer-box">
+                <h3><i class="bi bi-lightbulb"></i> How to Use This Map</h3>
+                <p>This map shows the total dollar amount of mortgages in each state. Darker colors indicate higher
+                    lending volume.</p>
+                <ul>
+                    <li><strong>Hover</strong> over a state to see details</li>
+                    <li><strong>Click</strong> a state to drill down to county-level data</li>
+                    <li><strong>Use the zoom tools</strong> in the top right to explore specific regions</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Disparity Analysis -->
+        <section aria-labelledby="disparity-section">
+            <div class="section-header">
+                <h2 id="disparity-section">Is There Discrimination?</h2>
+                <p>Examining approval rates by race and ethnicity</p>
+            </div>
+
+            <div class="explainer-box" style="background: #fff3cd; border-left-color: var(--warning-color);">
+                <h3><i class="bi bi-exclamation-triangle"></i> Understanding Disparities</h3>
+                <p><strong>Lending disparities</strong> occur when people from different racial or ethnic groups are
+                    approved for loans at different rates, even when they have similar qualifications.</p>
+                <p><strong>Why it matters:</strong> Fair housing laws prohibit discrimination in lending. If you see
+                    significant differences in approval rates, it may indicate discriminatory practices that deserve
+                    investigation.</p>
+            </div>
+
+            <div class="chart-container">
+                <div id="disparityChart" aria-label="Bar chart showing loan approval rates by applicant race"></div>
+            </div>
+
+            <div class="alert alert-info mt-3" role="alert">
+                <h4 class="alert-heading"><i class="bi bi-info-circle"></i> What You Can Do</h4>
+                <p class="mb-2">If you believe you've experienced discrimination in lending:</p>
+                <ul class="mb-0">
+                    <li>File a complaint with the <a href="https://www.consumerfinance.gov/complaint/" target="_blank"
+                            rel="noopener">Consumer Financial Protection Bureau</a></li>
+                    <li>Contact <a href="https://www.hud.gov/program_offices/fair_housing_equal_opp" target="_blank"
+                            rel="noopener">HUD Fair Housing</a> at 1-800-669-9777</li>
+                    <li>Reach out to local fair housing organizations in your area</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Top Lenders -->
+        <section aria-labelledby="top-lenders">
+            <div class="section-header">
+                <h2 id="top-lenders">Who Are the Major Lenders?</h2>
+                <p>Top mortgage lenders by application volume</p>
+            </div>
+
+            <div class="chart-container">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover" id="lenderTable"
+                        aria-label="Table of top mortgage lenders">
+                        <thead class="table-primary">
+                            <tr>
+                                <th scope="col">#</th>
+                                <th scope="col">Lender</th>
+                                <th scope="col">Applications</th>
+                                <th scope="col">Total Loan Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lenderTableBody">
+                            <tr>
+                                <td colspan="4" class="text-center">Loading lender data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Download Section -->
+        <section aria-labelledby="download-section" class="download-section">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h2 id="download-section"><i class="bi bi-download"></i> Get the Data</h2>
+                    <p class="mb-3">Download reports and data for your community. Use this information for research,
+                        advocacy, or community planning.</p>
+                    <ul>
+                        <li><strong>PDF Report:</strong> Easy-to-read community profile with key statistics</li>
+                        <li><strong>Excel Data:</strong> Complete dataset for your own analysis</li>
+                    </ul>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary btn-lg" onclick="downloadPDF()"
+                            aria-label="Download PDF community profile">
+                            <i class="bi bi-file-pdf"></i> Download PDF Report
+                        </button>
+                        <button class="btn btn-outline-primary btn-lg" onclick="downloadExcel()"
+                            aria-label="Download Excel data file">
+                            <i class="bi bi-file-spreadsheet"></i> Download Excel Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Additional Resources -->
+        <section aria-labelledby="resources">
+            <div class="section-header">
+                <h2 id="resources">Additional Resources</h2>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="stat-card">
+                        <h3><i class="bi bi-bank"></i> CFPB</h3>
+                        <p>Consumer Financial Protection Bureau provides mortgage resources and accepts complaints.</p>
+                        <a href="https://www.consumerfinance.gov" target="_blank" rel="noopener"
+                            class="btn btn-sm btn-outline-primary">Visit CFPB</a>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-card">
+                        <h3><i class="bi bi-house-door"></i> HUD Fair Housing</h3>
+                        <p>Report housing discrimination and learn about your rights as a homebuyer.</p>
+                        <a href="https://www.hud.gov/fairhousing" target="_blank" rel="noopener"
+                            class="btn btn-sm btn-outline-primary">Visit HUD</a>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-card">
+                        <h3><i class="bi bi-graph-up"></i> HMDA Data</h3>
+                        <p>Access the official HMDA database and explore data at multiple levels.</p>
+                        <a href="https://ffiec.cfpb.gov" target="_blank" rel="noopener"
+                            class="btn btn-sm btn-outline-primary">Visit HMDA</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="main-footer" role="contentinfo">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h4>About This Dashboard</h4>
+                    <p>The HMDA Community Explorer makes mortgage lending data accessible to everyone. Our mission is to
+                        promote fair housing and empower communities with data.</p>
+                </div>
+                <div class="col-md-3">
+                    <h4>Quick Links</h4>
+                    <ul class="list-unstyled">
+                        <li><a href="https://www.consumerfinance.gov/data-research/hmda/" target="_blank"
+                                rel="noopener">HMDA Data Documentation</a></li>
+                        <li><a href="https://www.consumerfinance.gov/complaint/" target="_blank" rel="noopener">File a
+                                Complaint</a></li>
+                        <li><a href="/api/health" target="_blank">API Health Check</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-3">
+                    <h4>Accessibility</h4>
+                    <p>This dashboard is designed to meet WCAG 2.1 AA standards. If you encounter accessibility issues,
+                        please contact us.</p>
+                </div>
+            </div>
+            <hr style="border-color: rgba(255,255,255,0.2); margin: 2rem 0;">
+            <div class="text-center">
+                <p>&copy; 2025 HMDA Community Explorer | Data Source: CFPB HMDA Dataset | Last Updated: <span
+                        id="lastUpdated">2024</span></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JavaScript -->
+    <script>
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function () {
+            console.log('Initializing HMDA Stakeholder Dashboard...');
+            loadDashboard();
+        });
+
+        async function loadDashboard() {
+            try {
+                // Initialize data
+                await fetch('/api/init');
+
+                // Load summary stats
+                await loadSummaryStats();
+
+                // Load charts
+                await loadStateMap();
+                await loadDisparityChart();
+                await loadTopLenders();
+
+                // Hide loading overlay
+                document.getElementById('loadingOverlay').classList.add('hidden');
+
+                console.log('Dashboard loaded successfully');
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+                document.getElementById('loadingOverlay').innerHTML = `
+                    <div class="alert alert-danger" role="alert">
+                        <h4>Error Loading Data</h4>
+                        <p>${error.message}</p>
+                        <button class="btn btn-primary" onclick="location.reload()">Retry</button>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadSummaryStats() {
+            const response = await fetch('/api/summary_stats');
+            const stats = await response.json();
+
+            // Format numbers
+            if (stats.total_loan_volume) {
+                document.getElementById('stat-loan-volume').textContent =
+                    '$' + (stats.total_loan_volume / 1e9).toFixed(1) + 'B';
+            }
+
+            if (stats.total_applications) {
+                document.getElementById('stat-applications').textContent =
+                    (stats.total_applications / 1e6).toFixed(1) + 'M';
+            }
+
+            if (stats.counties_covered) {
+                document.getElementById('stat-counties').textContent =
+                    stats.counties_covered.toLocaleString();
+            }
+
+            if (stats.lenders_tracked) {
+                document.getElementById('stat-lenders').textContent =
+                    stats.lenders_tracked.toLocaleString();
+            }
+        }
+
+        async function loadStateMap() {
+            const response = await fetch('/api/state_overview');
+            const figData = await response.json();
+
+            Plotly.newPlot('stateMapChart', figData.data, figData.layout, {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: ['lasso2d', 'select2d']
+            });
+        }
+
+        async function loadDisparityChart() {
+            const response = await fetch('/api/disparity_analysis');
+            const figData = await response.json();
+
+            Plotly.newPlot('disparityChart', figData.data, figData.layout, {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: ['lasso2d', 'select2d']
+            });
+        }
+
+        async function loadTopLenders() {
+            const response = await fetch('/api/top_lenders');
+            const lenders = await response.json();
+
+            const tbody = document.getElementById('lenderTableBody');
+            tbody.innerHTML = '';
+
+            lenders.forEach((lender, index) => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${lender.lei || 'Unknown'}</td>
+                    <td>${(lender.application_count || 0).toLocaleString()}</td>
+                    <td>$${(lender.loan_amount || 0).toLocaleString()}</td>
+                `;
+            });
+        }
+
+        function downloadPDF() {
+            window.open('/api/download/pdf', '_blank');
+        }
+
+        function downloadExcel() {
+            window.open('/api/download/excel', '_blank');
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,110 @@
+# ── HMDA public release .gitignore (code-only) ──────────────────────────────
+# Excludes the ~281 GB data corpora, caches, secrets, and internal docs.
+
+# ---- Large data dirs (never publish) ----
+/Inputs/
+/Outputs/
+/exact_replication_test/
+/_archive/
+Technical/data/
+Technical/HDARP/
+Technical/archive/
+Technical/CATALOG/
+**/analysis_outputs/
+**/census_csv/
+**/census_parsed*/
+**/r_modified/output*/
+
+# ---- Data file types (anywhere) ----
+*.csv
+*.tsv
+*.parquet
+*.dta
+*.rds
+*.rdb
+*.rdata
+*.RData
+*.feather
+*.zip
+*.gz
+*.tar
+*.7z
+*.pdf
+*.duckdb
+*.sqlite
+*.sqlite3
+*.db
+*.xlsx
+*.xls
+*.dat
+*.shp
+*.dbf
+*.shx
+*.geojson
+
+# ---- Caches / build / envs ----
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+node_modules/
+dist/
+build/
+*.log
+
+# ---- Secrets / keys ----
+.env
+*.env
+!.env.example
+**/api_keys*
+*.key
+*.pem
+credentials*
+secrets*
+
+# ---- Internal agent/process/planning docs (never publish) ----
+.claude/
+CLAUDE.md
+.cursor/
+AGENTS.md
+**/Handoffs/
+**/HANDOFF_*.md
+HANDOFF_DOCUMENTATION.md
+**/PROGRESS_LOG.md
+**/*PROGRESS_LOG*.md
+.hdarp_*.json
+**/_hdarp_*.json
+**/_process_pdfs_hdarp.py
+**/prepare_new_hdarp_docs.py
+**/_new_pdfs_to_prepare.json
+**/_unprocessed_pdfs.json
+Technical/docs/
+ARCHIVE_MIGRATION_NOTICE.md
+*_DECISION_LOG*.md
+*_WISHLIST*.md
+*_PLAN.md
+FINAL_ACTION_PLAN.md
+NEXT_STEPS*.md
+HMDA.code-workspace
+
+# ---- obvious internal process reports (extraction pipeline / housekeeping) ----
+**/HDARP_QUALITY_CHECKLIST.md
+**/HDARP_SETUP_VALIDATION_REPORT.md
+**/BATCH_*_QUALITY_VALIDATION_REPORT.md
+**/VALIDATION_QUICK_REFERENCE.txt
+FILE_ORGANIZATION_REPORT.md
+REGENERATION_REPORT_*.md
+
+# ---- this transformer (one-shot, not for release) ----
+_decouple_transform.py
+
+# ---- nested third-party repos ----
+**/.git/
