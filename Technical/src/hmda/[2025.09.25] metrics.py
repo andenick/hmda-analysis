@@ -57,11 +57,18 @@ def _add_basic_features(df: pd.DataFrame) -> pd.DataFrame:
     to_num = lambda s: pd.to_numeric(s, errors="coerce")
     out["loan_amount_num"] = to_num(out.get("loan_amount"))
 
-    # action flags
-    out["is_app"] = True
+    # action flags (raw HMDA action_taken codes)
+    out["is_app"] = True  # every record is an application-level row (incl. purchases/withdrawn)
     out["is_orig"] = (out["action_taken"] == "1")
     out["is_purch"] = (out["action_taken"] == "6")
     out["is_denied"] = (out["action_taken"] == "3")
+    # The LAR-derived "decisioned set" = applications acted upon by the lender:
+    #   1 = loan originated, 2 = approved but not accepted, 3 = denied.
+    # This is the correct denominator for the HMDA approval/denial rate. Codes
+    # 4 (withdrawn), 5 (file closed incomplete), 6 (loan purchased), 7/8
+    # (preapproval) are NOT lender decisions and are excluded. See
+    # Technical/src/p4_analysis/a0_rate_definitions.py for the audited definition.
+    out["is_decisioned"] = out["action_taken"].isin(["1", "2", "3"])
     return out
 
 
@@ -79,6 +86,7 @@ def compute_approval_denial_metrics(df: pd.DataFrame) -> pd.DataFrame:
         df.groupby(dims, dropna=False, observed=True)
           .agg(
               applications=("is_app", "sum"),
+              applications_acted_upon=("is_decisioned", "sum"),
               originations=("is_orig", "sum"),
               purchases=("is_purch", "sum"),
               denials=("is_denied", "sum"),
@@ -86,8 +94,12 @@ def compute_approval_denial_metrics(df: pd.DataFrame) -> pd.DataFrame:
           )
           .reset_index()
     )
-    # rates
-    denom = grouped["applications"].replace(0, pd.NA)
+    # HMDA approval/denial rates are computed over the LAR-decisioned set
+    # (action_taken in {1,2,3}), NOT over all records. Dividing originations by
+    # the raw record count ("applications", which here includes purchased/
+    # withdrawn/incomplete rows) understates the approval rate and is the
+    # share-of-records bug; use applications_acted_upon as the denominator.
+    denom = grouped["applications_acted_upon"].replace(0, pd.NA)
     grouped["approval_rate"] = grouped["originations"] / denom
     grouped["denial_rate"] = grouped["denials"] / denom
     return grouped
