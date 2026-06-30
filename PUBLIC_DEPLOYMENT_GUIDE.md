@@ -83,7 +83,7 @@ Before deployment, ensure your data is ready:
 
 1. **Process All Years**
    ```bash
-   cd D:/Arcanum/Projects/HMDA
+   cd /path/to/hmda-analysis
    python comprehensive_hmda_processor_fixed.py
    ```
 

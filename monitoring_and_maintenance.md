@@ -120,7 +120,7 @@ curl -f https://your-domain.com/api/health
 #### Processing Phase
 1. **Run Updated Processor**
    ```bash
-   cd D:/Arcanum/Projects/HMDA
+   cd /path/to/hmda-analysis
    python comprehensive_hmda_processor_fixed.py
    ```
 
